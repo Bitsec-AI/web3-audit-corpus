@@ -1,0 +1,47 @@
+{
+ "finding:0a683a057154ded3259bd58b28d1b4840028e0d09d2c0514a23e64b1a2236979": {
+  "note": "wrong function, SiloedPinto.sol#L310-L312 points to deposit",
+  "at": "2026-11-13T22:44:50.892Z",
+  "label": "fail"
+ },
+ "finding:be5a3c51388ca386571a562dafddc1cc228e6e3c8919c4737214cdbeb51bb22e": {
+  "label": "pass",
+  "note": "filename is  cp-amm/src/instructions/ix_remove_liquidity.rs includes poc",
+  "at": "2026-11-13T22:45:58.892Z"
+ },
+ "finding:3844083c44eceba7bf6ce718fabdebb9238d55f741da8524990cbaa926392d37": {
+  "note": "misses contracts and functions stated in the finding src/instructions/ix_funding_by_claim_damm_v2.rs",
+  "at": "2026-11-13T22:47:38.562Z",
+  "label": "pass"
+ },
+ "finding:35f943eb4e3d185fc0248400df4cf5400cf68879a6b0825080d5801622adad42": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T22:50:28.266Z"
+ },
+ "finding:fba9f5466d4be7627e6f130f0d82178caa93287d8a5e3b8d59ec658600536439": {
+  "label": "fail",
+  "note": "too many functions. root cause is not accounting, but wasting funds issue",
+  "at": "2026-11-13T22:56:07.339Z"
+ },
+ "finding:b30a1d6bf8b7b1056f5abecde02f7c41fd3d30a2e137b50dedd87d4f76a5b992": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T22:55:01.236Z"
+ },
+ "finding:444d460735c69909690b69a78677241a00ac9cfef8eeaf75e8c559d1c51ce6ef": {
+  "note": "contract scraper broken for rust      update_token_sale_event_vesting_options.rs\n",
+  "at": "2026-11-13T22:57:58.890Z",
+  "label": "pass"
+ },
+ "finding:99f65932125bc2e124a975cadb6dd22324978fc178d74415239f36d65a00c791": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T22:59:18.948Z"
+ },
+ "finding:72f3287ae7db958370ddcd3a0d773dd55bb0cdb511cbfd441cadfddd31404261": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T23:09:16.236Z"
+ }
+}

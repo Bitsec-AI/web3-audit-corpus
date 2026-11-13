@@ -111,10 +111,11 @@ kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px 
 <body>
 <header>
   <h1>Ground-truth review</h1>
+  <select id="dataset" aria-label="Dataset"><option value="findings">Starter set: 56 contest audits</option><option value="firm_sample">Firm sample: 90 findings, 6 firms</option></select>
   <div class="tabs" role="group" aria-label="View">
     <button id="tab-outline" aria-pressed="true">Outline</button><button id="tab-review" aria-pressed="false">Review</button>
   </div>
-  <select id="f-platform" aria-label="Platform"><option value="">All platforms</option><option value="sherlock">Sherlock</option><option value="code4rena">Code4rena</option></select>
+  <select id="f-platform" aria-label="Platform"><option value="">All sources</option></select>
   <select id="f-audit" aria-label="Audit"><option value="">All audits</option></select>
   <select id="f-group" aria-label="Root-cause group"><option value="">All root-cause groups</option></select>
   <select id="f-flag" aria-label="Flag"><option value="">Any flags</option></select>
@@ -182,6 +183,11 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "
 const FROM = {root_cause: "Root Cause section", summary: "Summary", detail: "Vulnerability Detail", lead: "opening text", poc: "Proof of Concept", attack: "Attack Path", title: "title only", impact: "Impact section"};
 let all = [], view = [], idx = 0, labels = {}, undoStack = [];
 
+const SOURCE = {sherlock: "Sherlock", code4rena: "Code4rena", openzeppelin: "OpenZeppelin", ottersec: "OtterSec", "code4rena-zenith": "Zenith",
+  spearbit: "Spearbit", cantina: "Cantina"};
+const sourceName = id => SOURCE[id] || id;
+const DATASET = new URLSearchParams(location.search).get("data") === "firm_sample" ? "firm_sample" : "findings";
+const LABELS_URL = "/api/labels?set=" + DATASET, STORE_KEY = "gt-review-labels-" + DATASET;
 const filters = () => ({platform: $("f-platform").value, audit: $("f-audit").value, group: $("f-group").value, flag: $("f-flag").value, label: $("f-label").value});
 
 function applyFilters() {
@@ -218,9 +224,9 @@ function renderOutline() {
   view.forEach((r, i) => {
     if (r.engagement_id !== last) {
       last = r.engagement_id;
-      html += `<tr class="audit-row"><td colspan="8">${esc(r.project)} · ${r.platform === "sherlock" ? "Sherlock" : "Code4rena"} ${r.audit_year ?? ""} · ${r.nsloc != null ? r.nsloc.toLocaleString() + " nSLOC" : "size unknown"}</td></tr>`;
+      html += `<tr class="audit-row"><td colspan="8">${esc(r.project)} · ${sourceName(r.platform)} ${r.audit_year ?? ""}${r.nsloc != null ? " · " + r.nsloc.toLocaleString() + " nSLOC" : ""}</td></tr>`;
     }
-    html += `<tr data-i="${i}"><td class="mono"><span class="sev ${r.severity}">${esc(r.finding_id)}</span></td><td class="title">${esc(r.title)}</td>
+    html += `<tr data-i="${i}"><td class="mono"><span class="sev ${r.severity}">${esc(r.finding_id || r.severity)}</span></td><td class="title">${esc(r.title)}</td>
       <td class="files">${fileChips(r, 3)}</td><td class="fns">${fnChips(r, 4)}</td><td class="cls">${classText(r)}</td>
       <td class="rc">${esc(r.root_cause)}</td><td class="imp">${r.impact ? esc(r.impact) : '<span class="missing">none</span>'}</td><td>${labelText(labels[r.uid])}</td></tr>`;
   });
@@ -245,9 +251,9 @@ function highlight(container, names) {
 function renderReview() {
   const r = view[idx];
   if (!r) { $("r-title").textContent = "No findings match these filters."; $("r-record").innerHTML = ""; $("r-body").innerHTML = ""; $("r-meta").innerHTML = ""; $("r-links").innerHTML = ""; $("r-lookalikes").innerHTML = ""; return; }
-  $("r-meta").innerHTML = `<span>${esc(r.project)}</span><span>${r.platform === "sherlock" ? "Sherlock" : "Code4rena"} ${r.audit_year ?? ""}</span><span>${r.nsloc != null ? r.nsloc.toLocaleString() + " nSLOC" : "size unknown"}</span><span class="mono">${esc(r.uid)}</span>`;
-  $("r-title").innerHTML = `<span class="sev ${r.severity}">${esc(r.finding_id)} · ${esc(r.severity)}</span><br>${esc(r.title)}`;
-  $("r-links").innerHTML = `${r.source_url ? `<a href="${esc(r.source_url)}" target="_blank" rel="noopener">Original issue ↗</a>` : ""}${r.code_url ? `<a href="${esc(r.code_url)}" target="_blank" rel="noopener">Audited code ↗</a>` : ""}
+  $("r-meta").innerHTML = `<span>${esc(r.project)}</span><span>${sourceName(r.platform)} ${r.audit_year ?? ""}</span>${r.nsloc != null ? `<span>${r.nsloc.toLocaleString()} nSLOC</span>` : ""}<span class="mono">${esc(r.uid)}</span>`;
+  $("r-title").innerHTML = `<span class="sev ${r.severity}">${r.finding_id ? esc(r.finding_id) + " · " : ""}${esc(r.severity)}</span><br>${esc(r.title)}`;
+  $("r-links").innerHTML = `${r.source_url ? `<a href="${esc(r.source_url)}" target="_blank" rel="noopener">${/\/issues\/\d+/.test(r.source_url) ? "Original issue" : "Report"} ↗</a>` : ""}${r.code_url ? `<a href="${esc(r.code_url)}" target="_blank" rel="noopener">Audited code ↗</a>` : ""}
     <span class="badge ${r.poc ? "on" : ""}">${r.poc ? "PoC test" : "no PoC test"}</span><span class="badge ${r.fix ? "on" : ""}">${r.fix ? "fix diff/link" : "no fix"}</span>`;
   const pairs = r.functions.length ? r.functions.map(f => `<span class="chip mono">${esc(f)} · ${esc(r.leaf)}</span>`).join("") : '<span class="missing">no function to pair</span>';
   $("r-record").innerHTML = `
@@ -258,9 +264,10 @@ function renderReview() {
     <dt>Function · class</dt><dd>${pairs}</dd>
     <dt>Root cause</dt><dd class="sentence">${esc(r.root_cause)}<span class="from">from ${FROM[r.root_cause_from] || r.root_cause_from}</span></dd>
     <dt>Impact</dt><dd class="sentence">${r.impact ? `${esc(r.impact)}<span class="from">from Impact section</span>` : '<span class="missing">no Impact section</span>'}</dd>
+    <dt>Fix</dt><dd>${r.fix_ref ? `<span class="sentence">${esc(r.fix_ref)}</span>` : r.fix ? "diff or fix link in text" : '<span class="missing">none found</span>'}</dd>
     <dt>Flags</dt><dd><div class="flags">${r.flags.length ? r.flags.map(f => `<span class="flag">${esc(f)}</span>`).join("") : '<span class="from" style="margin:0">none</span>'}</div></dd>`;
   $("r-lookalikes").innerHTML = r.look_alikes.length ? `<ul class="lookalikes">${r.look_alikes.map(o => `<li class="${o.same_class ? "same" : ""}">
-      <a data-uid="${esc(o.uid)}"><b class="mono">${esc(o.finding_id)}</b> ${esc(o.title)}</a><br>
+      <a data-uid="${esc(o.uid)}"><b class="mono">${esc(o.finding_id || "")}</b> ${esc(o.title)}</a><br>
       <span class="from" style="margin:0">shares ${o.shared.map(esc).join(", ")} · <span class="mono">${esc(o.leaf)}</span>${o.same_class ? " · <b>same class</b>" : ""}</span></li>`).join("")}</ul>`
     : '<span class="from" style="margin:0">No other finding in this audit names these functions.</span>';
   const isMd = /```|^#{1,6}\s/m.test(r.body);
@@ -286,12 +293,12 @@ function renderProgress() {
 
 let saveTimer;
 function save() {
-  try { localStorage.setItem("gt-review-labels", JSON.stringify(labels)); } catch (e) {}
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(labels)); } catch (e) {}
   $("save-status").textContent = "Saving…";
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      const res = await fetch("/api/labels", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(labels)});
+      const res = await fetch(LABELS_URL, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(labels)});
       $("save-status").textContent = res.ok ? "Saved" : "Save failed (kept in browser)";
     } catch (e) { $("save-status").textContent = "Save failed (kept in browser)"; }
   }, 150);
@@ -345,7 +352,7 @@ $("jump").addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
   const q = e.target.value.trim().toLowerCase(); if (!q) return;
   const pool = view.length ? view : all;
-  const hit = pool.find(r => r.uid.toLowerCase() === q) || pool.find(r => r.finding_id.toLowerCase() === q) || pool.find(r => r.title.toLowerCase().includes(q)) || all.find(r => r.title.toLowerCase().includes(q));
+  const hit = pool.find(r => r.uid.toLowerCase() === q) || pool.find(r => (r.finding_id || "").toLowerCase() === q) || pool.find(r => r.title.toLowerCase().includes(q)) || all.find(r => r.title.toLowerCase().includes(q));
   if (hit) openUid(hit.uid); else e.target.setCustomValidity("No match"), e.target.reportValidity(), setTimeout(() => e.target.setCustomValidity(""), 1500);
 });
 document.addEventListener("keydown", e => {
@@ -362,10 +369,13 @@ document.addEventListener("keydown", e => {
 });
 
 (async () => {
-  const data = await (await fetch("findings.json")).json();
+  $("dataset").value = DATASET;
+  $("dataset").onchange = e => { location.href = "?data=" + e.target.value; };
+  const data = await (await fetch(DATASET + ".json")).json();
   all = data.findings.sort((a, b) => (a.nsloc ?? 1e9) - (b.nsloc ?? 1e9) || a.engagement_id.localeCompare(b.engagement_id));
-  try { labels = await (await fetch("/api/labels")).json(); } catch (e) { labels = {}; }
-  if (!Object.keys(labels).length) { try { labels = JSON.parse(localStorage.getItem("gt-review-labels") || "{}"); } catch (e) {} }
+  try { labels = await (await fetch(LABELS_URL)).json(); } catch (e) { labels = {}; }
+  if (!Object.keys(labels).length) { try { labels = JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); } catch (e) {} }
+  $("f-platform").innerHTML += [...new Set(all.map(r => r.platform))].map(p => `<option value="${esc(p)}">${esc(sourceName(p))}</option>`).join("");
   const audits = new Map(); all.forEach(r => audits.set(r.engagement_id, r));
   $("f-audit").innerHTML += [...audits.values()].map(r => `<option value="${esc(r.engagement_id)}">${esc(r.project)} (${r.nsloc ?? "?"})</option>`).join("");
   const groups = [...new Set(all.map(r => r.group))].sort();

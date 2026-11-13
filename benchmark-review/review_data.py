@@ -27,7 +27,13 @@ SECTION_NAMES = {
     "tool used": "tools", "tools used": "tools", "recommendation": "fix", "recommendations": "fix", "mitigation": "fix",
     "recommended mitigation": "fix", "recommended mitigation steps": "fix", "suggested mitigation": "fix",
     "discussion": "discussion", "found by": "found_by", "assessed type": "assessed",
+    # Firm-review labels (Spearbit/Cantina, OtterSec, Zenith, OpenZeppelin)
+    "context": "context", "severity": "severity", "likelihood": "severity", "remediation": "fix", "patch": "status",
+    "resolution": "status", "status": "status", "update": "status",
 }
+# 'Description: text…' style labels that start a section on the same line.
+INLINE_LABEL = re.compile(r"^\s*\**(description|impact|recommendation|root cause|summary|context|remediation|patch|resolution|severity|likelihood"
+                          r"|proof of concept|update)\**\s*:\s*(?=\S)", re.I | re.M)
 HEADING = re.compile(r"^\s*(?:#{1,6}\s*)?\**\s*(" + "|".join(sorted(map(re.escape, SECTION_NAMES), key=len, reverse=True)) +
                      r")\s*\**\s*:?\s*\**\s*$", re.I | re.M)
 BLOB_LINK = re.compile(r"github\.com/([\w.-]+/[\w.-]+)/blob/[\w.-]+/([^\s#)>\]?]+)")
@@ -37,6 +43,13 @@ FILE_LABEL = re.compile(r"^\s*File:\s*([\w/.-]+\.(?:sol|vy|rs|move|cairo))", re.
 QUALIFIED = re.compile(r"\b([A-Z][A-Za-z0-9_]*)(?:\.|::)(_?[a-z]\w*)")
 NOT_CONTRACTS = {"SafeERC20", "SafeTransferLib", "Math", "FixedPointMathLib", "SafeCast", "Address", "ECDSA", "ERC20", "ERC721",
                  "Strings", "EnumerableSet", "Clones", "MerkleProof", "console", "Errors", "Events", "Solmate", "OpenZeppelin"}
+# Function names written in prose, as firm reports do: "the `withdraw` function", "calls _validateAndBurn".
+NAMED_FN = re.compile(r"\b(?:the|in|of|calls?|calling|invokes?)\s+`?(_?[A-Za-z][A-Za-z0-9_]{2,})`?\s+(?:function|method|modifier|instruction|handler|entrypoint)\b")
+NOT_NAMED = {"same", "following", "above", "below", "internal", "external", "public", "private", "view", "pure", "this", "that", "hook", "callback",
+             "fallback", "receive", "constructor", "main", "core", "helper", "affected", "vulnerable", "relevant", "new", "old", "former", "latter",
+             "whole", "entire", "said", "payable", "admin", "owner", "user", "each", "every", "other", "another", "corresponding", "respective"}
+FIX_REF = re.compile(r"(?i)\b(?:fixed|resolved|addressed|patched|remediated|mitigated)\b[^\n]{0,80}?(?:\bPR\b|pull request|commit)\s*#?\s*\w*\d\w*|"
+                     r"github\.com/[^\s)]+/(?:pull/\d+|commit/[0-9a-f]{6,})")
 QA_LEAK = re.compile(r"low risk and non-critical issues|non-critical issues list|low risk issues list", re.I)
 FENCE = re.compile(r"```.*?(?:```|\Z)", re.S)
 MD_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
@@ -47,7 +60,7 @@ SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z`(\[])")
 def sections(body):
     """First non-empty text under each known heading, keyed by section kind; the text before the first heading is 'lead'."""
     out = {}
-    marks = list(HEADING.finditer(body))
+    marks = sorted(list(HEADING.finditer(body)) + list(INLINE_LABEL.finditer(body)), key=lambda m: m.start())
     out["lead"] = body[:marks[0].start()] if marks else body
     for m, nxt in zip(marks, marks[1:] + [None]):
         kind = SECTION_NAMES[m.group(1).lower()]
@@ -63,6 +76,7 @@ def prose(text, limit=500):
     for para in re.split(r"\n\s*\n", text):
         lines = [l.strip() for l in para.splitlines()]
         lines = [l for l in lines if l and not l.lstrip("*_ ").startswith(("#", "|", "Submitted by", "Source:", "Issue ", "File:"))
+                 and not re.match(r"^\d+(?:\.\d+)+\s", l)
                  and not re.match(r"^\d+:\s", l) and not re.fullmatch(r"<?https?://\S+>?(<br>)?", l)]
         joined = re.sub(r"\s+", " ", " ".join(lines)).replace(",! ", "").strip()
         joined = URL.sub("", joined).strip()
@@ -123,13 +137,28 @@ def contracts_in(text, files, functions):
     return names, [{"function": fn, "contract": pairs.get(fn)} for fn in functions]
 
 
+def no_nan(value):
+    """Replace pandas NaN (e.g. a missing finding id) with None so the output is valid JSON."""
+    if isinstance(value, float) and value != value:
+        return None
+    if isinstance(value, dict):
+        return {k: no_nan(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [no_nan(v) for v in value]
+    return value
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--release", default="data/release")
     ap.add_argument("--scope", default="data/release/scope")
+    ap.add_argument("--engagements", default=str(HERE / "shortlist_56.txt"), help="file listing engagement ids to include")
+    ap.add_argument("--findings", help="file listing finding uids to include instead of whole engagements")
     ap.add_argument("--out", default=str(HERE / "review" / "findings.json"))
     args = ap.parse_args()
-    ids = [l.strip() for l in (HERE / "shortlist_56.txt").read_text().splitlines() if l.startswith("engagement:")]
+    listed = lambda path, prefix: [l.split("#")[0].strip() for l in Path(path).read_text().splitlines() if l.startswith(prefix)]  # noqa: E731
+    uids = listed(args.findings, "finding:") if args.findings else None
+    ids = listed(args.engagements, "engagement:") if not uids else []
 
     c = duckdb.connect()
     c.execute(f"create view e as select * from read_csv_auto('{args.release}/engagements.csv', all_varchar=true)")
@@ -139,15 +168,15 @@ def main():
                    f.vuln_confidence, f.vuln_needs_review, f.body_text, f.ordinal, e.project, try_cast(e.audit_year as int) audit_year, r.url report_url
             from '{args.release}/findings.parquet' f join e using(engagement_id) left join r on r.report_id = e.primary_report_id
             where f.selected_for_stats and f.severity in ('critical','high','medium') and f.body_text_status = 'present'
-              and f.engagement_id in (select unnest(?))
-            order by e.project, f.ordinal""", [ids]).df()
+              and (f.engagement_id in (select unnest(?)) or f.finding_uid in (select unnest(?)))
+            order by e.project, f.ordinal""", [ids, uids or []]).df()
     scope = R.load_scope(args.scope)
     df = R.apply_contest_names(df.merge(scope[["engagement_id", "contest_title", "contest_year"]], on="engagement_id", how="left"))
     df = df.merge(scope[["engagement_id", "contest_key", "nsloc", "repo", "commit"]], on="engagement_id", how="left")
     scope_files = {}
     for path in Path(args.scope).glob("*.json"):
         rec = json.loads(path.read_text())
-        if "engagement_id" in rec and rec["engagement_id"] in ids:
+        if "engagement_id" in rec and rec["engagement_id"] in set(df.engagement_id):
             scope_files[rec["engagement_id"]] = {Path(f["name"]).name for f in rec.get("files") or []}
 
     records = []
@@ -156,7 +185,9 @@ def main():
         desc = R.description(body)
         secs = sections(body)
         functions = R.functions_in(body)
-        files = files_in(desc + "\n" + secs.get("snippet", "") + "\n" + secs.get("loc", ""), row.repo or "", scope_files.get(row.engagement_id) or set())
+        functions += sorted({m for m in NAMED_FN.findall(desc) if m.lower() not in NOT_NAMED and m not in functions and m not in R.NOT_FUNCTIONS})
+        fix_ref = FIX_REF.search(body)
+        files = files_in(desc + "\n" + secs.get("snippet", "") + "\n" + secs.get("loc", "") + "\n" + secs.get("context", ""), row.repo or "", scope_files.get(row.engagement_id) or set())
         contracts, fn_contract = contracts_in(desc, files, functions)
         root, root_from = first_prose(secs, ["root_cause", "summary", "detail", "lead", "poc", "attack"])
         impact, impact_from = first_prose(secs, ["impact"])
@@ -169,9 +200,10 @@ def main():
             "severity": row.severity, "group": row.vuln_group, "leaf": row.vuln_leaf, "confidence": round(float(row.vuln_confidence), 3),
             "needs_review": bool(row.vuln_needs_review), "files": files, "contracts": contracts, "functions": functions,
             "fn_contract": fn_contract, "root_cause": root, "root_cause_from": root_from, "impact": impact, "impact_from": impact_from,
-            "poc": R.has_poc(body), "fix": R.has_diff(body) or bool(R.FIX_LINK.search(body)),
+            "poc": R.has_poc(body), "fix": R.has_diff(body) or bool(R.FIX_LINK.search(body)) or bool(fix_ref),
+            "fix_ref": fix_ref.group(0)[:160] if fix_ref else None,
             "source_url": m.group(0) if (m := ISSUE_LINK.search(body)) else row.report_url,
-            "code_url": f"https://github.com/{row.repo}/tree/{row.commit}" if row.repo and row.commit else None,
+            "code_url": f"https://github.com/{row.repo}/tree/{row.commit}" if isinstance(row.repo, str) and isinstance(row.commit, str) else None,
             "qa_leak": bool(QA_LEAK.search(body)), "body": body,
         })
 
@@ -204,7 +236,7 @@ def main():
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"findings": records}, separators=(",", ":"), default=str))
+    out.write_text(json.dumps({"findings": no_nan(records)}, separators=(",", ":"), default=str, allow_nan=False))
     n = len(records)
     count = lambda f: sum(f(r) for r in records)  # noqa: E731
     print(f"{n} findings in {len(by_audit)} audits -> {out}")

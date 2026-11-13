@@ -1,4 +1,4 @@
-"""Serve the ground-truth review app and save labels to labels.json next to this file.
+"""Serve the ground-truth review app and save labels next to this file (labels.json, or labels_<set>.json per dataset).
 
     .venv/bin/python -I benchmark-review/review/serve.py [--port 8765]
 """
@@ -7,9 +7,15 @@ import json
 import os
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 HERE = Path(__file__).resolve().parent
-LABELS = HERE / "labels.json"
+
+
+def labels_path(path):
+    """labels.json for the starter set, labels_<set>.json for other datasets (?set=<name>)."""
+    name = (parse_qs(urlparse(path).query).get("set") or ["findings"])[0]
+    return HERE / ("labels.json" if name == "findings" else f"labels_{''.join(ch for ch in name if ch.isalnum() or ch == '_')}.json")
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -25,17 +31,19 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path == "/api/labels":
-            return self.send_json(json.loads(LABELS.read_text()) if LABELS.exists() else {})
+        if self.path.split("?")[0] == "/api/labels":
+            path = labels_path(self.path)
+            return self.send_json(json.loads(path.read_text()) if path.exists() else {})
         return super().do_GET()
 
     def do_POST(self):
-        if self.path != "/api/labels":
+        if self.path.split("?")[0] != "/api/labels":
             return self.send_json({"error": "not found"}, 404)
         labels = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-        tmp = LABELS.with_suffix(".tmp")
+        path = labels_path(self.path)
+        tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(labels, indent=1))
-        os.replace(tmp, LABELS)
+        os.replace(tmp, path)
         self.send_json({"saved": len(labels)})
 
     def log_message(self, *a):
