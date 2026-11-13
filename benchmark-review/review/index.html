@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ground-truth review</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e2dd; --soft: #f0efeb;
+  --accent: #2f5fb3; --pass: #1f7a4a; --pass-bg: #e3f2e9; --fail: #b3362f; --fail-bg: #f8e4e2;
+  --defer: #8a6a12; --defer-bg: #f6eed6; --warn-bg: #fff4d6; --warn: #8a5a00; --high: #b3362f; --medium: #b9770e;
+  --mark: #fff0a8; --code-bg: #f3f2ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c9b95; --line: #34342f; --soft: #272724;
+    --accent: #7ea6f0; --pass: #6cc896; --pass-bg: #1d3327; --fail: #f08a82; --fail-bg: #3a2120;
+    --defer: #e3c26a; --defer-bg: #352d17; --warn-bg: #3a3017; --warn: #f0c66a; --high: #f08a82; --medium: #f0b45a;
+    --mark: #5b4f12; --code-bg: #262623;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+a { color: var(--accent); }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+header h1 { font-size: 15px; margin: 0 8px 0 0; }
+.tabs button { border: 1px solid var(--line); background: var(--soft); color: var(--ink); padding: 5px 12px; cursor: pointer; font: inherit; }
+.tabs button:first-child { border-radius: 6px 0 0 6px; } .tabs button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.tabs button[aria-pressed=true] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+select, input[type=search] { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); max-width: 220px; }
+.progress { margin-left: auto; color: var(--muted); font-size: 13px; }
+.progress b { color: var(--ink); }
+main { max-width: 1280px; margin: 0 auto; padding: 20px; }
+main:has(#outline:not(.hidden)) { max-width: 1680px; }
+.hidden { display: none !important; }
+
+/* Outline */
+.coverage { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 120px; }
+.stat b { display: block; font-size: 18px; } .stat span { color: var(--muted); font-size: 12px; }
+.table-wrap { overflow-x: auto; border-radius: 8px; }
+@media (max-width: 900px) { .table-wrap table.outline { min-width: 1100px; } header { position: static; } }
+table.outline { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
+table.outline th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 8px; border-bottom: 1px solid var(--line); background: var(--panel); white-space: nowrap; }
+table.outline td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.outline tr:hover td { background: var(--soft); cursor: pointer; }
+td.rc, td.imp { min-width: 220px; max-width: 280px; }
+td.cls { max-width: 190px; }
+table.outline .chip { white-space: nowrap; overflow-wrap: normal; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+td.files { max-width: 180px; } td.fns { min-width: 170px; max-width: 260px; } td.title { max-width: 240px; font-weight: 500; }
+.audit-row td { background: var(--soft); font-weight: 600; cursor: default !important; }
+
+/* Review */
+.finding-head { margin-bottom: 14px; }
+.meta { overflow-wrap: anywhere; min-width: 0; color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.finding-head h2 { font-size: 20px; margin: 6px 0 8px; line-height: 1.3; }
+.sev { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.sev.high { color: var(--high); } .sev.medium { color: var(--medium); } .sev.critical { color: var(--high); }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { dl.record { grid-template-columns: 1fr; gap: 2px 0; } dl.record dd { margin-bottom: 10px; } main { padding: 16px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+dl.record { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px 14px; margin: 0; }
+dl.record dt { color: var(--muted); font-size: 13px; padding-top: 2px; }
+dl.record dd { margin: 0; }
+.chip { max-width: 100%; overflow-wrap: anywhere; display: inline-block; padding: 1px 7px; margin: 0 4px 4px 0; border-radius: 5px; background: var(--soft); border: 1px solid var(--line); }
+.chip.ext { opacity: .55; } .chip.mention { border-style: dashed; }
+.chip .sub { color: var(--muted); }
+.missing { display: inline-block; background: var(--warn-bg); color: var(--warn); padding: 1px 8px; border-radius: 5px; font-size: 13px; }
+.from { color: var(--muted); font-size: 12px; margin-left: 6px; overflow-wrap: anywhere; }
+.sentence { font-size: 14.5px; }
+.flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.flag { background: var(--warn-bg); color: var(--warn); border-radius: 5px; padding: 1px 8px; font-size: 12px; }
+.badge { font-size: 12px; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); }
+.badge.on { color: var(--pass); border-color: var(--pass); }
+ul.lookalikes { margin: 0; padding: 0; list-style: none; }
+ul.lookalikes li { padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+ul.lookalikes li:first-child { border-top: 0; padding-top: 0; }
+ul.lookalikes li.same { border-left: 3px solid var(--fail); padding-left: 8px; }
+ul.lookalikes a { cursor: pointer; }
+details.body > summary { cursor: pointer; font-weight: 600; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.body-text { margin-top: 12px; overflow-wrap: anywhere; }
+.body-text pre { background: var(--code-bg); padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 12px; white-space: pre; }
+.body-text.plain { white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.body-text code { background: var(--code-bg); padding: 0 3px; border-radius: 3px; }
+.body-text pre code { background: none; padding: 0; }
+.body-text h1, .body-text h2 { font-size: 16px; } .body-text h3, .body-text h4 { font-size: 14px; }
+.body-text mark { background: var(--mark); color: inherit; border-radius: 2px; }
+.legend { color: var(--muted); font-size: 12px; margin-top: 10px; }
+
+/* Action bar */
+.actions { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; z-index: 5; }
+.actions .wrap { max-width: 1280px; margin: 0 auto; width: 100%; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { font: inherit; font-weight: 600; border-radius: 8px; padding: 8px 16px; cursor: pointer; border: 2px solid transparent; }
+.btn.pass { background: var(--pass-bg); color: var(--pass); border-color: var(--pass); }
+.btn.fail { background: var(--fail-bg); color: var(--fail); border-color: var(--fail); }
+.btn.defer { background: var(--defer-bg); color: var(--defer); border-color: transparent; font-weight: 500; }
+.btn.nav { background: var(--soft); color: var(--ink); border-color: var(--line); font-weight: 500; padding: 8px 12px; }
+.btn.active { box-shadow: 0 0 0 3px var(--ink) inset; }
+textarea { flex: 1; min-width: 220px; font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical; height: 40px; }
+.status { font-size: 12px; color: var(--muted); min-width: 110px; }
+.current-label { font-size: 13px; font-weight: 600; }
+.help { color: var(--muted); font-size: 12px; width: 100%; }
+kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--soft); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ground-truth review</h1>
+  <div class="tabs" role="group" aria-label="View">
+    <button id="tab-outline" aria-pressed="true">Outline</button><button id="tab-review" aria-pressed="false">Review</button>
+  </div>
+  <select id="f-platform" aria-label="Platform"><option value="">All platforms</option><option value="sherlock">Sherlock</option><option value="code4rena">Code4rena</option></select>
+  <select id="f-audit" aria-label="Audit"><option value="">All audits</option></select>
+  <select id="f-group" aria-label="Root-cause group"><option value="">All root-cause groups</option></select>
+  <select id="f-flag" aria-label="Flag"><option value="">Any flags</option></select>
+  <select id="f-label" aria-label="Label"><option value="">All labels</option><option value="none">Unlabelled</option><option value="pass">Pass</option><option value="fail">Fail</option><option value="defer">Deferred</option></select>
+  <input id="jump" type="search" placeholder="Jump: H-03, uid, title…" aria-label="Jump to finding">
+  <div class="progress" id="progress"></div>
+</header>
+
+<main>
+  <section id="outline">
+    <div class="coverage" id="coverage"></div>
+    <div class="table-wrap"><table class="outline">
+      <thead><tr><th>ID</th><th>Title</th><th>Files</th><th>Function → contract</th><th>Root-cause class</th><th>Root cause</th><th>Impact</th><th>Label</th></tr></thead>
+      <tbody id="outline-body"></tbody>
+    </table></div>
+  </section>
+
+  <section id="review" class="hidden">
+    <div class="finding-head">
+      <div class="meta" id="r-meta"></div>
+      <h2 id="r-title"></h2>
+      <div class="meta" id="r-links"></div>
+    </div>
+    <div class="layout">
+      <div>
+        <div class="card">
+          <h3>Ground-truth record</h3>
+          <dl class="record" id="r-record"></dl>
+          <div class="legend">Files: solid = linked to the audited code, dashed = named in the text, faded = another repo. ✓ = in the contest's scope list.</div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3>Same function elsewhere in this audit</h3>
+          <div id="r-lookalikes"></div>
+        </div>
+      </div>
+      <div class="card">
+        <details class="body" id="r-body-wrap" open>
+          <summary>Full finding text</summary>
+          <div class="body-text" id="r-body"></div>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="actions hidden" id="actions">
+  <div class="wrap">
+    <button class="btn nav" id="prev" title="Previous (←)">←</button>
+    <button class="btn nav" id="next" title="Next (→)">→</button>
+    <span id="counter" class="status"></span>
+    <button class="btn pass" id="b-pass">Pass <kbd>1</kbd></button>
+    <button class="btn fail" id="b-fail">Fail <kbd>2</kbd></button>
+    <button class="btn defer" id="b-defer">Defer <kbd>D</kbd></button>
+    <textarea id="note" placeholder="Notes: what is wrong or missing in this record?"></textarea>
+    <span class="current-label" id="current-label"></span>
+    <span class="status" id="save-status"></span>
+    <div class="help">Pass = usable ground truth: one real bug, and the file, functions, root cause and impact are right. Fail = something is wrong; say what in the notes.
+      <kbd>←</kbd><kbd>→</kbd> move · <kbd>U</kbd> undo · <kbd>⌘S</kbd> save note · <kbd>⌘↵</kbd> save and next</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const FROM = {root_cause: "Root Cause section", summary: "Summary", detail: "Vulnerability Detail", lead: "opening text", poc: "Proof of Concept", attack: "Attack Path", title: "title only", impact: "Impact section"};
+let all = [], view = [], idx = 0, labels = {}, undoStack = [];
+
+const filters = () => ({platform: $("f-platform").value, audit: $("f-audit").value, group: $("f-group").value, flag: $("f-flag").value, label: $("f-label").value});
+
+function applyFilters() {
+  const f = filters();
+  view = all.filter(r => (!f.platform || r.platform === f.platform) && (!f.audit || r.engagement_id === f.audit) &&
+    (!f.group || r.group === f.group) && (!f.flag || (f.flag === "none" ? !r.flags.length : r.flags.includes(f.flag))) &&
+    (!f.label || (f.label === "none" ? !labels[r.uid]?.label : labels[r.uid]?.label === f.label)));
+  idx = Math.min(idx, Math.max(view.length - 1, 0));
+  renderOutline(); renderReview(); renderProgress();
+}
+
+function fileChips(r, max = 99) {
+  if (!r.files.length) return '<span class="missing">none found</span>';
+  return r.files.slice(0, max).map(f => `<span class="chip mono ${f.external ? "ext" : ""} ${f.how === "mention" ? "mention" : ""}" title="${esc(f.path)}${f.external ? " (another repo)" : ""}">${esc(f.name)}${f.in_scope ? " ✓" : ""}</span>`).join("") +
+    (r.files.length > max ? `<span class="chip">+${r.files.length - max}</span>` : "");
+}
+function fnChips(r, max = 99) {
+  if (!r.fn_contract.length) return '<span class="missing">none named</span>';
+  return r.fn_contract.slice(0, max).map(p => `<span class="chip mono">${p.contract ? `<span class="sub">${esc(p.contract)}.</span>` : ""}${esc(p.function)}</span>`).join("") +
+    (r.fn_contract.length > max ? `<span class="chip">+${r.fn_contract.length - max}</span>` : "");
+}
+const classText = r => `<span class="mono">${esc(r.leaf).replace(".", ".<wbr>")}</span>`;
+const labelText = l => l ? `<span style="color:var(--${l.label})">${{pass: "Pass", fail: "Fail", defer: "Deferred"}[l.label] || ""}</span>${l.note ? " ✎" : ""}` : "";
+
+function renderOutline() {
+  const n = view.length, pct = k => n ? Math.round(100 * view.filter(k).length / n) + "%" : "–";
+  $("coverage").innerHTML = [
+    [n, "findings in view"], [new Set(view.map(r => r.engagement_id)).size, "audits"],
+    [pct(r => r.files.some(f => !f.external)), "name a file"], [pct(r => r.contracts.length), "name a contract"],
+    [pct(r => r.functions.length), "name a function"], [pct(r => r.impact), "have an Impact section"],
+    [pct(r => r.flags.includes("same function + class as another finding")), "share function + class"],
+  ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+  let html = "", last = null;
+  view.forEach((r, i) => {
+    if (r.engagement_id !== last) {
+      last = r.engagement_id;
+      html += `<tr class="audit-row"><td colspan="8">${esc(r.project)} · ${r.platform === "sherlock" ? "Sherlock" : "Code4rena"} ${r.audit_year ?? ""} · ${r.nsloc != null ? r.nsloc.toLocaleString() + " nSLOC" : "size unknown"}</td></tr>`;
+    }
+    html += `<tr data-i="${i}"><td class="mono"><span class="sev ${r.severity}">${esc(r.finding_id)}</span></td><td class="title">${esc(r.title)}</td>
+      <td class="files">${fileChips(r, 3)}</td><td class="fns">${fnChips(r, 4)}</td><td class="cls">${classText(r)}</td>
+      <td class="rc">${esc(r.root_cause)}</td><td class="imp">${r.impact ? esc(r.impact) : '<span class="missing">none</span>'}</td><td>${labelText(labels[r.uid])}</td></tr>`;
+  });
+  $("outline-body").innerHTML = html || '<tr><td colspan="8">No findings match these filters.</td></tr>';
+}
+
+function highlight(container, names) {
+  if (!names.length) return;
+  const re = new RegExp(`\\b(${names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "g");
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) if (re.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode), re.lastIndex = 0;
+  for (const node of nodes) {
+    const frag = document.createDocumentFragment();
+    let last = 0, text = node.nodeValue;
+    text.replace(re, (m, _g, off) => { frag.append(text.slice(last, off)); const mk = document.createElement("mark"); mk.textContent = m; frag.append(mk); last = off + m.length; });
+    frag.append(text.slice(last));
+    node.replaceWith(frag);
+  }
+}
+
+function renderReview() {
+  const r = view[idx];
+  if (!r) { $("r-title").textContent = "No findings match these filters."; $("r-record").innerHTML = ""; $("r-body").innerHTML = ""; $("r-meta").innerHTML = ""; $("r-links").innerHTML = ""; $("r-lookalikes").innerHTML = ""; return; }
+  $("r-meta").innerHTML = `<span>${esc(r.project)}</span><span>${r.platform === "sherlock" ? "Sherlock" : "Code4rena"} ${r.audit_year ?? ""}</span><span>${r.nsloc != null ? r.nsloc.toLocaleString() + " nSLOC" : "size unknown"}</span><span class="mono">${esc(r.uid)}</span>`;
+  $("r-title").innerHTML = `<span class="sev ${r.severity}">${esc(r.finding_id)} · ${esc(r.severity)}</span><br>${esc(r.title)}`;
+  $("r-links").innerHTML = `${r.source_url ? `<a href="${esc(r.source_url)}" target="_blank" rel="noopener">Original issue ↗</a>` : ""}${r.code_url ? `<a href="${esc(r.code_url)}" target="_blank" rel="noopener">Audited code ↗</a>` : ""}
+    <span class="badge ${r.poc ? "on" : ""}">${r.poc ? "PoC test" : "no PoC test"}</span><span class="badge ${r.fix ? "on" : ""}">${r.fix ? "fix diff/link" : "no fix"}</span>`;
+  const pairs = r.functions.length ? r.functions.map(f => `<span class="chip mono">${esc(f)} · ${esc(r.leaf)}</span>`).join("") : '<span class="missing">no function to pair</span>';
+  $("r-record").innerHTML = `
+    <dt>Files</dt><dd>${fileChips(r)}</dd>
+    <dt>Contracts</dt><dd>${r.contracts.length ? r.contracts.map(c => `<span class="chip mono">${esc(c)}</span>`).join("") : '<span class="missing">none found</span>'}</dd>
+    <dt>Functions</dt><dd>${fnChips(r)}</dd>
+    <dt>Root-cause class</dt><dd><span class="mono">${esc(r.group)}</span> › <b class="mono">${esc(r.leaf)}</b><span class="from">confidence ${r.confidence}${r.needs_review ? " · needs review" : ""}</span></dd>
+    <dt>Function · class</dt><dd>${pairs}</dd>
+    <dt>Root cause</dt><dd class="sentence">${esc(r.root_cause)}<span class="from">from ${FROM[r.root_cause_from] || r.root_cause_from}</span></dd>
+    <dt>Impact</dt><dd class="sentence">${r.impact ? `${esc(r.impact)}<span class="from">from Impact section</span>` : '<span class="missing">no Impact section</span>'}</dd>
+    <dt>Flags</dt><dd><div class="flags">${r.flags.length ? r.flags.map(f => `<span class="flag">${esc(f)}</span>`).join("") : '<span class="from" style="margin:0">none</span>'}</div></dd>`;
+  $("r-lookalikes").innerHTML = r.look_alikes.length ? `<ul class="lookalikes">${r.look_alikes.map(o => `<li class="${o.same_class ? "same" : ""}">
+      <a data-uid="${esc(o.uid)}"><b class="mono">${esc(o.finding_id)}</b> ${esc(o.title)}</a><br>
+      <span class="from" style="margin:0">shares ${o.shared.map(esc).join(", ")} · <span class="mono">${esc(o.leaf)}</span>${o.same_class ? " · <b>same class</b>" : ""}</span></li>`).join("")}</ul>`
+    : '<span class="from" style="margin:0">No other finding in this audit names these functions.</span>';
+  const isMd = /```|^#{1,6}\s/m.test(r.body);
+  const body = $("r-body");
+  body.className = "body-text" + (isMd ? "" : " plain");
+  if (isMd) body.innerHTML = DOMPurify.sanitize(marked.parse(r.body), {FORBID_TAGS: ["img", "style", "iframe", "form"]});
+  else body.textContent = r.body;
+  body.querySelectorAll("a").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
+  highlight(body, r.functions);
+  const l = labels[r.uid] || {};
+  $("note").value = l.note || "";
+  $("current-label").innerHTML = labelText(l.label ? l : null);
+  for (const k of ["pass", "fail", "defer"]) $("b-" + k).classList.toggle("active", l.label === k);
+  $("counter").textContent = view.length ? `${idx + 1} of ${view.length}` : "0 of 0";
+  if (!$("review").classList.contains("hidden")) history.replaceState(null, "", "#" + r.uid);
+}
+
+function renderProgress() {
+  const done = all.filter(r => labels[r.uid]?.label);
+  const c = k => done.filter(r => labels[r.uid].label === k).length;
+  $("progress").innerHTML = `<b>${done.length}</b> labelled · ${all.length - done.length} to go · ${c("pass")} pass · ${c("fail")} fail · ${c("defer")} deferred`;
+}
+
+let saveTimer;
+function save() {
+  try { localStorage.setItem("gt-review-labels", JSON.stringify(labels)); } catch (e) {}
+  $("save-status").textContent = "Saving…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const res = await fetch("/api/labels", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(labels)});
+      $("save-status").textContent = res.ok ? "Saved" : "Save failed (kept in browser)";
+    } catch (e) { $("save-status").textContent = "Save failed (kept in browser)"; }
+  }, 150);
+}
+
+function setLabel(label) {
+  const r = view[idx]; if (!r) return;
+  undoStack.push([r.uid, labels[r.uid] ? {...labels[r.uid]} : null]);
+  labels[r.uid] = {...(labels[r.uid] || {}), label, note: $("note").value, at: new Date().toISOString()};
+  save(); renderProgress(); renderReview();
+}
+function saveNote() {
+  const r = view[idx]; if (!r) return;
+  const note = $("note").value;
+  if ((labels[r.uid]?.note || "") === note) return;
+  undoStack.push([r.uid, labels[r.uid] ? {...labels[r.uid]} : null]);
+  labels[r.uid] = {...(labels[r.uid] || {}), note, at: new Date().toISOString()};
+  save(); renderProgress();
+}
+function undo() {
+  const last = undoStack.pop(); if (!last) return;
+  const [uid, prev] = last;
+  if (prev) labels[uid] = prev; else delete labels[uid];
+  const i = view.findIndex(r => r.uid === uid); if (i >= 0) idx = i;
+  save(); renderProgress(); renderReview();
+}
+function go(delta) { saveNote(); if (!view.length) return; idx = Math.max(0, Math.min(view.length - 1, idx + delta)); renderReview(); window.scrollTo(0, 0); }
+
+function show(tab) {
+  const review = tab === "review";
+  $("outline").classList.toggle("hidden", review); $("review").classList.toggle("hidden", !review); $("actions").classList.toggle("hidden", !review);
+  $("tab-outline").setAttribute("aria-pressed", !review); $("tab-review").setAttribute("aria-pressed", review);
+  if (!review) renderOutline();
+  history.replaceState(null, "", review && view[idx] ? "#" + view[idx].uid : "#");
+}
+function openUid(uid) {
+  let i = view.findIndex(r => r.uid === uid);
+  if (i < 0) { for (const id of ["f-platform", "f-audit", "f-group", "f-flag", "f-label"]) $(id).value = ""; applyFilters(); i = view.findIndex(r => r.uid === uid); }
+  if (i >= 0) { saveNote(); idx = i; renderReview(); show("review"); window.scrollTo(0, 0); }
+}
+
+$("tab-outline").onclick = () => { saveNote(); show("outline"); };
+$("tab-review").onclick = () => show("review");
+$("outline-body").onclick = e => { const tr = e.target.closest("tr[data-i]"); if (tr) { idx = +tr.dataset.i; renderReview(); show("review"); window.scrollTo(0, 0); } };
+$("r-lookalikes").onclick = e => { const a = e.target.closest("a[data-uid]"); if (a) openUid(a.dataset.uid); };
+for (const id of ["f-platform", "f-audit", "f-group", "f-flag", "f-label"]) $(id).onchange = () => { saveNote(); idx = 0; applyFilters(); };
+$("prev").onclick = () => go(-1); $("next").onclick = () => go(1);
+$("b-pass").onclick = () => setLabel("pass"); $("b-fail").onclick = () => setLabel("fail"); $("b-defer").onclick = () => setLabel("defer");
+$("note").addEventListener("blur", saveNote);
+$("jump").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const q = e.target.value.trim().toLowerCase(); if (!q) return;
+  const pool = view.length ? view : all;
+  const hit = pool.find(r => r.uid.toLowerCase() === q) || pool.find(r => r.finding_id.toLowerCase() === q) || pool.find(r => r.title.toLowerCase().includes(q)) || all.find(r => r.title.toLowerCase().includes(q));
+  if (hit) openUid(hit.uid); else e.target.setCustomValidity("No match"), e.target.reportValidity(), setTimeout(() => e.target.setCustomValidity(""), 1500);
+});
+document.addEventListener("keydown", e => {
+  const typing = ["TEXTAREA", "INPUT", "SELECT"].includes(document.activeElement?.tagName);
+  const inReview = !$("review").classList.contains("hidden");
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveNote(); return; }
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && inReview) { e.preventDefault(); saveNote(); go(1); return; }
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || !inReview) return;
+  const k = e.key.toLowerCase();
+  if (k === "arrowright") go(1); else if (k === "arrowleft") go(-1);
+  else if (k === "1") setLabel("pass"); else if (k === "2") setLabel("fail"); else if (k === "d") setLabel("defer"); else if (k === "u") undo();
+  else return;
+  e.preventDefault();
+});
+
+(async () => {
+  const data = await (await fetch("findings.json")).json();
+  all = data.findings.sort((a, b) => (a.nsloc ?? 1e9) - (b.nsloc ?? 1e9) || a.engagement_id.localeCompare(b.engagement_id));
+  try { labels = await (await fetch("/api/labels")).json(); } catch (e) { labels = {}; }
+  if (!Object.keys(labels).length) { try { labels = JSON.parse(localStorage.getItem("gt-review-labels") || "{}"); } catch (e) {} }
+  const audits = new Map(); all.forEach(r => audits.set(r.engagement_id, r));
+  $("f-audit").innerHTML += [...audits.values()].map(r => `<option value="${esc(r.engagement_id)}">${esc(r.project)} (${r.nsloc ?? "?"})</option>`).join("");
+  const groups = [...new Set(all.map(r => r.group))].sort();
+  $("f-group").innerHTML += groups.map(g => `<option>${esc(g)}</option>`).join("");
+  const flags = {}; all.forEach(r => r.flags.forEach(f => flags[f] = (flags[f] || 0) + 1));
+  $("f-flag").innerHTML += `<option value="none">No flags</option>` + Object.entries(flags).sort((a, b) => b[1] - a[1]).map(([f, n]) => `<option value="${esc(f)}">${esc(f)} (${n})</option>`).join("");
+  applyFilters();
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (hash) openUid(hash);
+})();
+</script>
+</body>
+</html>
