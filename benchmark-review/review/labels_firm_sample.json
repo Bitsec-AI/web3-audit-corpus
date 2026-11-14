@@ -43,5 +43,200 @@
   "label": "pass",
   "note": "",
   "at": "2026-11-13T23:09:16.236Z"
+ },
+ "finding:9cd67a3cbb5a2713ced3ccce4a4110449bc6d1e9f25aba52881617fed25a89e9": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T23:17:04.437Z"
+ },
+ "finding:e46f7ff1cbc60d4b1f7564d698df0fb5915309febe606aead1ab56b05b3a8cd9": {
+  "label": "fail",
+  "note": "",
+  "at": "2026-11-13T23:17:28.252Z"
+ },
+ "finding:bf55b02bef1a53951b213f87391b9e99e6dd13d3a691d5fc35a8d58e01aa62f6": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T23:17:55.282Z"
+ },
+ "finding:ca2498fed195f78cdbe821a4bf2365aa34bc30d9489c0f659673fe4ced8e1133": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T23:18:57.675Z"
+ },
+ "finding:495ab0e5c71b32c410633aa66259784f9240bf3378d2b12da539dc5f880528d5": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T23:20:09.082Z"
+ },
+ "finding:d00b00c547fed4914c450e3b28bc3cda21b204ad7b7e9b4cbc5ee4bbd4d34eed": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-13T23:27:29.883Z"
+ },
+ "finding:56c3fe0e989acf173f50f5ebff3bfc496df803a712a0b4c1fb1e569caa3e4e86": {
+  "note": "CreditBroker.liquidate and CreditBroker.withdrawCollateral functions named",
+  "at": "2026-11-14T02:09:34.869Z",
+  "label": "pass"
+ },
+ "finding:b36b5b406b12eac97f47db7cb10919e5f085fcb260aae5e0ae3cfad88265d84b": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:13:01.715Z"
+ },
+ "finding:5047f900d598f89751daa244afd6adc6e59bf51cb4a3f42d95fa40fe2796171b": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:13:16.896Z"
+ },
+ "finding:5e9db3b414db8e858ed062ed4295df6635f495e559d23c7adccf16632c5d4ad4": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:14:05.312Z"
+ },
+ "finding:5085acb1c72e000ea3e3bbc84c34edea776d46680bddd96d4e7560fa7e012836": {
+  "label": "defer",
+  "note": "",
+  "at": "2026-11-14T02:14:33.052Z"
+ },
+ "finding:6acfbd6a54112bf200d719c6ba7cfd654f5af677c372938698d08bf4fd646105": {
+  "label": "fail",
+  "note": "",
+  "at": "2026-11-14T02:14:59.268Z"
+ },
+ "finding:77e8260cd69c8d4cb0416a8c07bfbfc66f5c3d89c81f8e2a407ffbb63b73da96": {
+  "label": "fail",
+  "note": "",
+  "at": "2026-11-14T02:15:20.063Z"
+ },
+ "finding:9ceeff444c2e21d7c234c530961a1ae76ec54c1859f36f4fa426ddf540bf2863": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:19:26.542Z"
+ },
+ "finding:b5b73ddcd9cdac29618c48fdb6416667f1ab534615179751cd7596979be6d156": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:33:59.871Z"
+ },
+ "finding:1d90cf583415547b833f6d3aa3f90989fd0721cc9d8f1a23ce63efbf0d1fae7e": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:34:34.655Z"
+ },
+ "finding:f8ba5b25fc4a981c8bffe4f79c26dc2e71fa185e5573c07450938d9b9f04c001": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T02:35:10.198Z"
+ },
+ "finding:55bb0e8b38a3a06afa77c87883b70de8d1f9aa5a462bd9205e3f35fad12aa4da": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:00:24.912Z"
+ },
+ "finding:944e5c89a92a57c667b35240c65e08650f65f417f30663c3fc04a10d15c39d67": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:40:44.465Z"
+ },
+ "finding:1f9bae1e1e276ba78a8589c5b7be43f0d1e473819dd4f211467e3b6f2154e235": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:41:09.172Z"
+ },
+ "finding:8eef65b50ef79fc2fb68fd950dc7a100e49b0cddacf729c2ae23a5c5ef0a0279": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:55:33.777Z"
+ },
+ "finding:f7393d2ed446d9693468629c029f7cc3469bf27e4ef3b64a1528e485e751c51b": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:56:35.150Z"
+ },
+ "finding:6bf2cefc207a3bcd6e0681d1b57f2242d026d02b8d8c9355fffe88a30e1d9186": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:57:33.084Z"
+ },
+ "finding:6954f1614e9de22de6e37c957a7cfc3e1ddcfb535b07c67b6e597b57f7282e01": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:57:45.784Z"
+ },
+ "finding:31fc223dd90eb6278e7b15cd48186478aa5619ade10393ed99d4012ffd9c23d9": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:58:33.751Z"
+ },
+ "finding:2d02bdc3e3a7c38a920f995f2635e9d3324c5f98caeb12738754fcafbbdd334e": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T03:59:24.868Z"
+ },
+ "finding:3a52f582bf7eac7643b4ebae6a555723b304c2ce8ad2fec386f9fa5a4b1143de": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:00:06.931Z"
+ },
+ "finding:3b6e1ad82edb6a5b2a09971c81cb56697b793de6a7ee6711f3327755c0709ce1": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:00:36.974Z"
+ },
+ "finding:335f21aa19da5d96fa7e275f24af81694b0f102454aa58d0dd5f2a7a6ae80e4b": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:00:43.687Z"
+ },
+ "finding:3fc7c08d9927ccf6415ae8a49e3f571ebd4e99b5f38d51b6cd921761c1661c33": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:00:54.470Z"
+ },
+ "finding:0affd5b7b1dad0ef586ac9db0a2439a4bb5f298e110146d97335a811ab6b21a9": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:15.148Z"
+ },
+ "finding:de984e4440caf2b5c9efd853299ee07932425627dfe8f728b74ffce0d555f793": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:21.757Z"
+ },
+ "finding:8060d72c6cda515d007c645c5e4107988a4e196ac83787c46b2a6767a87b5156": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:33.935Z"
+ },
+ "finding:cbf6c475ec22c37e704b77e29a98a48f9d3f6c9d12b19f573957a15d8fc8349f": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:42.132Z"
+ },
+ "finding:3a31879ae8f8b4388ec6c56d3c5d7c158f80ac87c0af32498eb88e3bbdba62fe": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:47.503Z"
+ },
+ "finding:6ddcd7dc7027e5e55bb48c3e8c4f2df9665d89d429cdccf8646bc6a6403d24a7": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:52.524Z"
+ },
+ "finding:a1d607983598ba197efccf99d22edccfca91289c601051f85a3777b01670e4bf": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:01:55.322Z"
+ },
+ "finding:4a8dd75446b243a9f8f57b403ea02b79819c7dfde9077c73c7d5d2d1d45f46e1": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:02:06.770Z"
+ },
+ "finding:7d76c6b3f0c7fdd0eb9c42eb949f7fc7a3ae054c399768040390ef0751b4ba74": {
+  "label": "pass",
+  "note": "",
+  "at": "2026-11-14T04:02:20.457Z"
  }
 }
