@@ -148,33 +148,24 @@ def no_nan(value):
     return value
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--release", default="data/release")
-    ap.add_argument("--scope", default="data/release/scope")
-    ap.add_argument("--engagements", default=str(HERE / "shortlist_56.txt"), help="file listing engagement ids to include")
-    ap.add_argument("--findings", help="file listing finding uids to include instead of whole engagements")
-    ap.add_argument("--out", default=str(HERE / "review" / "findings.json"))
-    args = ap.parse_args()
-    listed = lambda path, prefix: [l.split("#")[0].strip() for l in Path(path).read_text().splitlines() if l.startswith(prefix)]  # noqa: E731
-    uids = listed(args.findings, "finding:") if args.findings else None
-    ids = listed(args.engagements, "engagement:") if not uids else []
-
+def build(release, scope_dir, ids, uids=None, overlay=None):
+    """Review records for the critical/high/medium findings of engagements `ids` (or of finding uids `uids`).
+    `overlay(records)` may replace extracted fields (files, contracts, functions, ...) before look-alikes and flags."""
     c = duckdb.connect()
-    c.execute(f"create view e as select * from read_csv_auto('{args.release}/engagements.csv', all_varchar=true)")
-    c.execute(f"create view r as select * from read_csv_auto('{args.release}/reports.csv', all_varchar=true)")
+    c.execute(f"create view e as select * from read_csv_auto('{release}/engagements.csv', all_varchar=true)")
+    c.execute(f"create view r as select * from read_csv_auto('{release}/reports.csv', all_varchar=true)")
     df = c.execute(
         f"""select f.finding_uid, f.engagement_id, f.firm_id platform, f.finding_id, f.title, f.severity, f.vuln_group, f.vuln_leaf,
                    f.vuln_confidence, f.vuln_needs_review, f.body_text, f.ordinal, e.project, try_cast(e.audit_year as int) audit_year, r.url report_url
-            from '{args.release}/findings.parquet' f join e using(engagement_id) left join r on r.report_id = e.primary_report_id
+            from '{release}/findings.parquet' f join e using(engagement_id) left join r on r.report_id = e.primary_report_id
             where f.selected_for_stats and f.severity in ('critical','high','medium') and f.body_text_status = 'present'
               and (f.engagement_id in (select unnest(?)) or f.finding_uid in (select unnest(?)))
             order by e.project, f.ordinal""", [ids, uids or []]).df()
-    scope = R.load_scope(args.scope)
+    scope = R.load_scope(scope_dir)
     df = R.apply_contest_names(df.merge(scope[["engagement_id", "contest_title", "contest_year"]], on="engagement_id", how="left"))
     df = df.merge(scope[["engagement_id", "contest_key", "nsloc", "repo", "commit"]], on="engagement_id", how="left")
     scope_files = {}
-    for path in Path(args.scope).glob("*.json"):
+    for path in Path(scope_dir).glob("*.json"):
         rec = json.loads(path.read_text())
         if "engagement_id" in rec and rec["engagement_id"] in set(df.engagement_id):
             scope_files[rec["engagement_id"]] = {Path(f["name"]).name for f in rec.get("files") or []}
@@ -207,6 +198,9 @@ def main():
             "qa_leak": bool(QA_LEAK.search(body)), "body": body,
         })
 
+    if overlay:
+        overlay(records)
+
     # Other findings in the same audit that name a common function.
     by_audit = {}
     for rec in records:
@@ -233,18 +227,35 @@ def main():
         if any(l["same_class"] for l in rec["look_alikes"]):
             flags.append("same function + class as another finding")
         rec["flags"] = flags
+    return records
 
-    out = Path(args.out)
+
+def write(records, out):
+    out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"findings": no_nan(records)}, separators=(",", ":"), default=str, allow_nan=False))
     n = len(records)
     count = lambda f: sum(f(r) for r in records)  # noqa: E731
-    print(f"{n} findings in {len(by_audit)} audits -> {out}")
+    print(f"{n} findings in {len({r['engagement_id'] for r in records})} audits -> {out}")
     print(f"file {count(lambda r: any(not f['external'] for f in r['files']))}, contract {count(lambda r: bool(r['contracts']))}, "
           f"function {count(lambda r: bool(r['functions']))}, impact {count(lambda r: bool(r['impact']))}")
     print("root cause from:", {k: count(lambda r, k=k: r["root_cause_from"] == k) for k in sorted({r["root_cause_from"] for r in records})})
     print("functions with a contract:", sum(1 for r in records for p in r["fn_contract"] if p["contract"]), "of", sum(len(r["functions"]) for r in records))
     print("flags:", {f: count(lambda r, f=f: f in r["flags"]) for f in sorted({f for r in records for f in r["flags"]})})
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--release", default="data/release")
+    ap.add_argument("--scope", default="data/release/scope")
+    ap.add_argument("--engagements", default=str(HERE / "shortlist_56.txt"), help="file listing engagement ids to include")
+    ap.add_argument("--findings", help="file listing finding uids to include instead of whole engagements")
+    ap.add_argument("--out", default=str(HERE / "review" / "findings.json"))
+    args = ap.parse_args()
+    listed = lambda path, prefix: [l.split("#")[0].strip() for l in Path(path).read_text().splitlines() if l.startswith(prefix)]  # noqa: E731
+    uids = listed(args.findings, "finding:") if args.findings else None
+    ids = listed(args.engagements, "engagement:") if not uids else []
+    write(build(args.release, args.scope, ids, uids), args.out)
 
 
 if __name__ == "__main__":

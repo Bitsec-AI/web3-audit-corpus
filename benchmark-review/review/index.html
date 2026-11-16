@@ -105,13 +105,26 @@ textarea { flex: 1; min-width: 220px; font: inherit; padding: 7px 9px; border: 1
 .status { font-size: 12px; color: var(--muted); min-width: 110px; }
 .current-label { font-size: 13px; font-weight: 600; }
 .help { color: var(--muted); font-size: 12px; width: 100%; }
+ul.locs { margin: 0; padding: 0; list-style: none; }
+ul.locs li { padding: 3px 0; overflow-wrap: anywhere; }
+ul.locs .arrow { color: var(--muted); margin: 0 4px; }
+ul.fixes { margin: 0; padding: 0; list-style: none; }
+ul.fixes li { padding: 4px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+ul.fixes li:first-child { border-top: 0; padding-top: 0; }
+.ok { color: var(--pass); } .bad { color: var(--fail); }
+.diff-file { margin-top: 10px; }
+.diff-file > summary { cursor: pointer; font-family: ui-monospace, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.diff-file.touch > summary { font-weight: 700; }
+pre.diff { margin: 6px 0 0; background: var(--code-bg); border-radius: 6px; padding: 8px 0; overflow-x: auto; font-size: 12px; line-height: 1.45; }
+pre.diff span { display: block; padding: 0 10px; white-space: pre; }
+pre.diff .add { background: var(--pass-bg); } pre.diff .del { background: var(--fail-bg); } pre.diff .hunk { color: var(--accent); }
 kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--soft); }
 </style>
 </head>
 <body>
 <header>
   <h1>Ground-truth review</h1>
-  <select id="dataset" aria-label="Dataset"><option value="findings">Starter set: 56 contest audits</option><option value="firm_sample">Firm sample: 90 findings, 6 firms</option></select>
+  <select id="dataset" aria-label="Dataset"><option value="findings">Starter set: 56 contest audits</option><option value="firm_sample">Firm sample: 90 findings, 6 firms</option><option value="firm_code">Firm audits with code + fixes: 96 Spearbit/Cantina</option></select>
   <div class="tabs" role="group" aria-label="View">
     <button id="tab-outline" aria-pressed="true">Outline</button><button id="tab-review" aria-pressed="false">Review</button>
   </div>
@@ -144,7 +157,11 @@ kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px 
         <div class="card">
           <h3>Ground-truth record</h3>
           <dl class="record" id="r-record"></dl>
-          <div class="legend">Files: solid = linked to the audited code, dashed = named in the text, faded = another repo. ✓ = in the contest's scope list.</div>
+          <div class="legend">Files: solid = linked to (or fetched from) the audited code, dashed = named in the text, faded = another repo. ✓ = in the contest's scope list.</div>
+        </div>
+        <div class="card hidden" style="margin-top:16px" id="r-patch-card">
+          <h3>Fix patch</h3>
+          <div id="r-patch"></div>
         </div>
         <div class="card" style="margin-top:16px">
           <h3>Same function elsewhere in this audit</h3>
@@ -186,7 +203,7 @@ let all = [], view = [], idx = 0, labels = {}, undoStack = [];
 const SOURCE = {sherlock: "Sherlock", code4rena: "Code4rena", openzeppelin: "OpenZeppelin", ottersec: "OtterSec", "code4rena-zenith": "Zenith",
   spearbit: "Spearbit", cantina: "Cantina"};
 const sourceName = id => SOURCE[id] || id;
-const DATASET = new URLSearchParams(location.search).get("data") === "firm_sample" ? "firm_sample" : "findings";
+const DATASET = ["firm_sample", "firm_code"].includes(new URLSearchParams(location.search).get("data")) ? new URLSearchParams(location.search).get("data") : "findings";
 const LABELS_URL = "/api/labels?set=" + DATASET, STORE_KEY = "gt-review-labels-" + DATASET;
 const filters = () => ({platform: $("f-platform").value, audit: $("f-audit").value, group: $("f-group").value, flag: $("f-flag").value, label: $("f-label").value});
 
@@ -219,6 +236,7 @@ function renderOutline() {
     [pct(r => r.files.some(f => !f.external)), "name a file"], [pct(r => r.contracts.length), "name a contract"],
     [pct(r => r.functions.length), "name a function"], [pct(r => r.impact), "have an Impact section"],
     [pct(r => r.flags.includes("same function + class as another finding")), "share function + class"],
+    ...(all.some(r => r.fixes) ? [[pct(r => (r.fixes || []).some(x => x.status === "ok")), "have a fix patch"]] : []),
   ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
   let html = "", last = null;
   view.forEach((r, i) => {
@@ -248,9 +266,54 @@ function highlight(container, names) {
   }
 }
 
+function locRows(r) {
+  return `<ul class="locs">${r.locations.map(l => {
+    const lines = l.start ? `#L${l.start}${l.end && l.end !== l.start ? "-L" + l.end : ""}` : "";
+    const file = l.url ? `<a class="mono" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.path)}${lines}</a>` : `<span class="mono">${esc(l.path)}${lines}</span>`;
+    const what = l.functions.length ? l.functions.map(p => `<span class="chip mono">${p.contract ? `<span class="sub">${esc(p.contract)}.</span>` : ""}${esc(p.function)}</span>`).join("")
+      : l.code === "fetched" ? `<span class="missing">${l.start ? "outside any function" : "no lines given"}${l.contract ? " · " + esc(l.contract) : ""}</span>`
+      : `<span class="missing">${l.code === "unavailable" ? "file not fetched" : "not located in the code"}</span>`;
+    return `<li>${file}<span class="arrow">→</span>${what}</li>`;
+  }).join("")}</ul>`;
+}
+function fixRows(r) {
+  if (!r.fixes.length) return '<span class="missing">no PR or commit named in the fix reply</span>';
+  return `<ul class="fixes">${r.fixes.map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener" class="mono">${esc(x.repo)} ${x.kind === "pull" ? "PR " + esc(x.ref) : esc(x.ref.slice(0, 10))}</a>
+    ${x.inferred_repo ? `<span class="from">repo assumed</span>` : ""}${x.copy_repo ? `<span class="from">via public copy ${esc(x.copy_repo)}</span>` : ""}
+    ${x.status === "ok" ? `<span class="from"><span class="ok">+${x.additions}</span> <span class="bad">−${x.deletions}</span> · ${x.files.length} file${x.files.length === 1 ? "" : "s"}${x.touches_finding_file ? " · <b>touches the finding's file</b>" : ""}</span>`
+      : `<span class="missing">${{not_found: "not found / private", too_large: "diff too large", error: "fetch error"}[x.status] || esc(x.status)}</span>`}</li>`).join("")}</ul>`;
+}
+let patchToken = 0;
+async function renderPatch(r) {
+  const card = $("r-patch-card"), box = $("r-patch"), token = ++patchToken;
+  const patches = (r.fixes || []).filter(x => x.status === "ok");
+  card.classList.toggle("hidden", !patches.length);
+  if (!patches.length) return;
+  box.innerHTML = '<span class="from" style="margin:0">Loading…</span>';
+  const names = new Set(r.locations.map(l => l.path.split("/").pop()));
+  let html = "";
+  for (const x of patches) {
+    let text = "";
+    try { text = await (await fetch(x.patch)).text(); } catch (e) { text = ""; }
+    if (token !== patchToken) return;
+    const files = text.split(/^(?=diff --git )/m).filter(c => c.startsWith("diff --git"))
+      .map(c => ({path: (c.match(/^diff --git a\/(\S+)/) || [])[1] || "?", body: c}))
+      .map(f => ({...f, touch: names.has(f.path.split("/").pop())}))
+      .sort((a, b) => b.touch - a.touch);
+    html += `<div class="from" style="margin:8px 0 0"><b>${esc(x.repo)} ${x.kind === "pull" ? "PR " + esc(x.ref) : esc(x.ref.slice(0, 10))}</b> · ${files.length} files${files.length ? "" : " (empty diff)"}</div>`;
+    html += files.map(f => {
+      const lines = f.body.split("\n"), shown = lines.slice(0, 400);
+      const add = lines.filter(l => l.startsWith("+") && !l.startsWith("+++")).length, del = lines.filter(l => l.startsWith("-") && !l.startsWith("---")).length;
+      return `<details class="diff-file ${f.touch ? "touch" : ""}" ${f.touch ? "open" : ""}><summary>${esc(f.path)} <span class="ok">+${add}</span> <span class="bad">−${del}</span>${f.touch ? " · finding's file" : ""}</summary>
+        <pre class="diff">${shown.map(l => `<span class="${l.startsWith("+") && !l.startsWith("+++") ? "add" : l.startsWith("-") && !l.startsWith("---") ? "del" : l.startsWith("@@") ? "hunk" : ""}">${esc(l) || " "}</span>`).join("")}${lines.length > 400 ? `<span class="hunk">… ${lines.length - 400} more lines on GitHub</span>` : ""}</pre></details>`;
+    }).join("");
+  }
+  box.innerHTML = html;
+}
+
 function renderReview() {
   const r = view[idx];
-  if (!r) { $("r-title").textContent = "No findings match these filters."; $("r-record").innerHTML = ""; $("r-body").innerHTML = ""; $("r-meta").innerHTML = ""; $("r-links").innerHTML = ""; $("r-lookalikes").innerHTML = ""; return; }
+  if (!r) { $("r-patch-card").classList.add("hidden"); $("r-title").textContent = "No findings match these filters."; $("r-record").innerHTML = ""; $("r-body").innerHTML = ""; $("r-meta").innerHTML = ""; $("r-links").innerHTML = ""; $("r-lookalikes").innerHTML = ""; return; }
   $("r-meta").innerHTML = `<span>${esc(r.project)}</span><span>${sourceName(r.platform)} ${r.audit_year ?? ""}</span>${r.nsloc != null ? `<span>${r.nsloc.toLocaleString()} nSLOC</span>` : ""}<span class="mono">${esc(r.uid)}</span>`;
   $("r-title").innerHTML = `<span class="sev ${r.severity}">${r.finding_id ? esc(r.finding_id) + " · " : ""}${esc(r.severity)}</span><br>${esc(r.title)}`;
   $("r-links").innerHTML = `${r.source_url ? `<a href="${esc(r.source_url)}" target="_blank" rel="noopener">${/\/issues\/\d+/.test(r.source_url) ? "Original issue" : "Report"} ↗</a>` : ""}${r.code_url ? `<a href="${esc(r.code_url)}" target="_blank" rel="noopener">Audited code ↗</a>` : ""}
@@ -258,13 +321,14 @@ function renderReview() {
   const pairs = r.functions.length ? r.functions.map(f => `<span class="chip mono">${esc(f)} · ${esc(r.leaf)}</span>`).join("") : '<span class="missing">no function to pair</span>';
   $("r-record").innerHTML = `
     <dt>Files</dt><dd>${fileChips(r)}</dd>
+    ${r.locations ? `<dt>Code locations</dt><dd>${r.locations.length ? locRows(r) : '<span class="missing">no Context line</span>'}</dd>` : ""}
     <dt>Contracts</dt><dd>${r.contracts.length ? r.contracts.map(c => `<span class="chip mono">${esc(c)}</span>`).join("") : '<span class="missing">none found</span>'}</dd>
-    <dt>Functions</dt><dd>${fnChips(r)}</dd>
+    <dt>Functions</dt><dd>${fnChips(r)}${r.functions_text && r.functions_text.some(f => !r.functions.includes(f)) ? `<div class="from" style="margin:2px 0 0">also named in the text: ${r.functions_text.filter(f => !r.functions.includes(f)).map(f => `<span class="mono">${esc(f)}</span>`).join(", ")}</div>` : ""}</dd>
     <dt>Root-cause class</dt><dd><span class="mono">${esc(r.group)}</span> › <b class="mono">${esc(r.leaf)}</b><span class="from">confidence ${r.confidence}${r.needs_review ? " · needs review" : ""}</span></dd>
     <dt>Function · class</dt><dd>${pairs}</dd>
     <dt>Root cause</dt><dd class="sentence">${esc(r.root_cause)}<span class="from">from ${FROM[r.root_cause_from] || r.root_cause_from}</span></dd>
     <dt>Impact</dt><dd class="sentence">${r.impact ? `${esc(r.impact)}<span class="from">from Impact section</span>` : '<span class="missing">no Impact section</span>'}</dd>
-    <dt>Fix</dt><dd>${r.fix_ref ? `<span class="sentence">${esc(r.fix_ref)}</span>` : r.fix ? "diff or fix link in text" : '<span class="missing">none found</span>'}</dd>
+    <dt>Fix</dt><dd>${r.fixes ? fixRows(r) : r.fix_ref ? `<span class="sentence">${esc(r.fix_ref)}</span>` : r.fix ? "diff or fix link in text" : '<span class="missing">none found</span>'}</dd>
     <dt>Flags</dt><dd><div class="flags">${r.flags.length ? r.flags.map(f => `<span class="flag">${esc(f)}</span>`).join("") : '<span class="from" style="margin:0">none</span>'}</div></dd>`;
   $("r-lookalikes").innerHTML = r.look_alikes.length ? `<ul class="lookalikes">${r.look_alikes.map(o => `<li class="${o.same_class ? "same" : ""}">
       <a data-uid="${esc(o.uid)}"><b class="mono">${esc(o.finding_id || "")}</b> ${esc(o.title)}</a><br>
@@ -277,6 +341,7 @@ function renderReview() {
   else body.textContent = r.body;
   body.querySelectorAll("a").forEach(a => { a.target = "_blank"; a.rel = "noopener"; });
   highlight(body, r.functions);
+  renderPatch(r);
   const l = labels[r.uid] || {};
   $("note").value = l.note || "";
   $("current-label").innerHTML = labelText(l.label ? l : null);
