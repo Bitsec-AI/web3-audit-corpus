@@ -178,7 +178,7 @@ def build(release, scope_dir, ids, uids=None, overlay=None):
         functions = R.functions_in(body)
         functions += sorted({m for m in NAMED_FN.findall(desc) if m.lower() not in NOT_NAMED and m not in functions and m not in R.NOT_FUNCTIONS})
         fix_ref = FIX_REF.search(body)
-        files = files_in(desc + "\n" + secs.get("snippet", "") + "\n" + secs.get("loc", "") + "\n" + secs.get("context", ""), row.repo or "", scope_files.get(row.engagement_id) or set())
+        files = files_in(desc + "\n" + secs.get("snippet", "") + "\n" + secs.get("loc", "") + "\n" + secs.get("context", ""), row.repo if isinstance(row.repo, str) else "", scope_files.get(row.engagement_id) or set())
         contracts, fn_contract = contracts_in(desc, files, functions)
         root, root_from = first_prose(secs, ["root_cause", "summary", "detail", "lead", "poc", "attack"])
         impact, impact_from = first_prose(secs, ["impact"])

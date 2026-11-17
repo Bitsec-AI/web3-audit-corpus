@@ -124,7 +124,7 @@ kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px 
 <body>
 <header>
   <h1>Ground-truth review</h1>
-  <select id="dataset" aria-label="Dataset"><option value="findings">Starter set: 56 contest audits</option><option value="firm_sample">Firm sample: 90 findings, 6 firms</option><option value="firm_code">Firm audits with code + fixes: 96 Spearbit/Cantina</option></select>
+  <select id="dataset" aria-label="Dataset"><option value="findings">Starter set: 56 contest audits</option><option value="firm_sample">Firm sample: 90 findings, 6 firms</option><option value="firm_code">Firm audits with code + fixes: 96 Spearbit/Cantina</option><option value="firm_others">Firm audits with code + fixes: OpenZeppelin, OtterSec, Zenith, Sherlock</option></select>
   <div class="tabs" role="group" aria-label="View">
     <button id="tab-outline" aria-pressed="true">Outline</button><button id="tab-review" aria-pressed="false">Review</button>
   </div>
@@ -203,7 +203,7 @@ let all = [], view = [], idx = 0, labels = {}, undoStack = [];
 const SOURCE = {sherlock: "Sherlock", code4rena: "Code4rena", openzeppelin: "OpenZeppelin", ottersec: "OtterSec", "code4rena-zenith": "Zenith",
   spearbit: "Spearbit", cantina: "Cantina"};
 const sourceName = id => SOURCE[id] || id;
-const DATASET = ["firm_sample", "firm_code"].includes(new URLSearchParams(location.search).get("data")) ? new URLSearchParams(location.search).get("data") : "findings";
+const DATASET = ["firm_sample", "firm_code", "firm_others"].includes(new URLSearchParams(location.search).get("data")) ? new URLSearchParams(location.search).get("data") : "findings";
 const LABELS_URL = "/api/labels?set=" + DATASET, STORE_KEY = "gt-review-labels-" + DATASET;
 const filters = () => ({platform: $("f-platform").value, audit: $("f-audit").value, group: $("f-group").value, flag: $("f-flag").value, label: $("f-label").value});
 
